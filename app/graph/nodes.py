@@ -1,12 +1,12 @@
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.graph.state import SupportState
 from app.services.classifier import classify_ticket
 from app.services.rag_service import hybrid_search, generate_rag_response
 
 
-async def classify_node(state: SupportState, db: AsyncSession) -> dict:
+async def classify_node(state: SupportState, config: RunnableConfig) -> dict:
     description = state.get("description", "")
     if not description:
         return {"error": "No description provided for classification"}
@@ -21,7 +21,8 @@ async def classify_node(state: SupportState, db: AsyncSession) -> dict:
     }
 
 
-async def retrieve_node(state: SupportState, db: AsyncSession) -> dict:
+async def retrieve_node(state: SupportState, config: RunnableConfig) -> dict:
+    db = config["configurable"]["db"]
     query = state.get("description", "")
     if state.get("summary"):
         query = state["summary"]
@@ -30,7 +31,7 @@ async def retrieve_node(state: SupportState, db: AsyncSession) -> dict:
     return {"retrieved_docs": docs}
 
 
-async def analyze_node(state: SupportState, db: AsyncSession) -> dict:
+async def analyze_node(state: SupportState) -> dict:
     docs = state.get("retrieved_docs", [])
     high_score_docs = [d for d in docs if d.get("score", 0) > 0.5]
     return {
@@ -52,7 +53,7 @@ async def check_escalation_node(state: SupportState) -> dict:
     return {"requires_escalation": requires_escalation}
 
 
-async def generate_response_node(state: SupportState, db: AsyncSession) -> dict:
+async def generate_response_node(state: SupportState) -> dict:
     query = state.get("description", "")
     docs = state.get("retrieved_docs", [])
 

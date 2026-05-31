@@ -21,8 +21,8 @@ async def create_ticket_endpoint(data: TicketCreate, db: AsyncSession = Depends(
         customer_id=ticket.customer_id,
         description=ticket.description or "",
     )
-    config = {"configurable": {"thread_id": str(ticket.id)}}
-    await support_graph.ainvoke(state, config, db=db)
+    config = {"configurable": {"thread_id": str(ticket.id), "db": db}}
+    await support_graph.ainvoke(state, config)
 
     ticket = await update_ticket(db, ticket.id, {"status": "processing"})
     return ticket

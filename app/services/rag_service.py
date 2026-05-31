@@ -1,11 +1,10 @@
+import random
+
 from pydantic import BaseModel
-from openai import OpenAI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-
-client = OpenAI(api_key=settings.openai_api_key)
 
 
 class RAGResponse(BaseModel):
@@ -14,8 +13,17 @@ class RAGResponse(BaseModel):
     confidence: str
 
 
+_has_key = bool(settings.openai_api_key) and settings.openai_api_key != "sk-..."
+if _has_key:
+    from openai import OpenAI
+    _client = OpenAI(api_key=settings.openai_api_key)
+
+
 def embed_text(text: str) -> list[float]:
-    response = client.embeddings.create(
+    if not _has_key:
+        random.seed(hash(text) % (2**32))
+        return [random.random() * 2 - 1 for _ in range(1536)]
+    response = _client.embeddings.create(
         model=settings.embedding_model,
         input=text,
     )
@@ -29,8 +37,9 @@ async def hybrid_search(
     source_filter: str | None = None,
 ) -> list[dict]:
     query_embedding = embed_text(query)
+    embedding_str = str(query_embedding)
 
-    sql = text("""
+    sql = text(f"""
         WITH vector_results AS (
             SELECT
                 dc.id,
@@ -38,14 +47,14 @@ async def hybrid_search(
                 dc.source_id,
                 dc.heading,
                 ds.title AS source_title,
-                1 - (dc.embedding <=> :vec::vector) AS vector_score,
+                1 - (dc.embedding <=> '{embedding_str}'::vector) AS vector_score,
                 ts_rank(
                     to_tsvector('english', dc.content),
                     plainto_tsquery('english', :query)
                 ) AS text_score
             FROM document_chunks dc
             JOIN document_sources ds ON ds.id = dc.source_id
-            WHERE (:source IS NULL OR ds.id::text = :source)
+            WHERE (:source = '' OR ds.id::text = :source)
             ORDER BY vector_score DESC
             LIMIT :top_k * 2
         )
@@ -59,9 +68,8 @@ async def hybrid_search(
     result = await db.execute(
         sql,
         {
-            "vec": str(query_embedding),
             "query": query,
-            "source": source_filter,
+            "source": source_filter or "",
             "top_k": top_k,
         },
     )
@@ -90,12 +98,25 @@ async def generate_rag_response(
             confidence="low",
         )
 
+    if not _has_key:
+        citations = [
+            {"source_title": c["source_title"], "heading": c.get("heading"), "content": c["content"][:200]}
+            for c in retrieved_chunks[:3]
+        ]
+        return RAGResponse(
+            answer=f"[Mock RAG] Based on the documentation, I found relevant information about your question. "
+                   f"The top result from \"{retrieved_chunks[0]['source_title']}\" mentions: "
+                   f"{retrieved_chunks[0]['content'][:300]}",
+            citations=citations,
+            confidence="medium",
+        )
+
     context = "\n\n".join(
         f"[Source: {c['heading'] or c['source_title']}]\n{c['content']}"
         for c in retrieved_chunks
     )
 
-    response = client.beta.chat.completions.parse(
+    response = _client.beta.chat.completions.parse(
         model=settings.openai_model,
         messages=[
             {

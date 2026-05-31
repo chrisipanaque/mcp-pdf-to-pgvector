@@ -10,16 +10,27 @@ import argparse
 import sys
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Must import config before anything else to load .env
 from app.config import settings
 
-from openai import OpenAI
+import random
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-client = OpenAI(api_key=settings.openai_api_key)
+_has_key = bool(settings.openai_api_key) and settings.openai_api_key != "sk-..."
+if _has_key:
+    from openai import OpenAI
+    _client = OpenAI(api_key=settings.openai_api_key)
+
+
+def _embed_text(text: str) -> list[float]:
+    if _has_key:
+        resp = _client.embeddings.create(model=settings.embedding_model, input=text)
+        return resp.data[0].embedding
+    random.seed(hash(text) % (2**32))
+    return [random.random() * 2 - 1 for _ in range(1536)]
 
 DOCUMENTS = [
     {
@@ -224,15 +235,10 @@ TICKETS = [
 ]
 
 
-def embed_text(text: str) -> list[float]:
-    resp = client.embeddings.create(model=settings.embedding_model, input=text)
-    return resp.data[0].embedding
-
-
 def seed_documents(session: Session) -> list[str]:
     """Create support documents with embedded chunks. Returns list of source IDs."""
     source_ids = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for doc in DOCUMENTS:
         source_id = str(uuid.uuid4())
@@ -248,13 +254,14 @@ def seed_documents(session: Session) -> list[str]:
 
         for i, chunk in enumerate(doc["chunks"]):
             chunk_id = str(uuid.uuid4())
-            embedding = embed_text(chunk["content"])
+            embedding = _embed_text(chunk["content"])
             tokens = len(chunk["content"].split())
 
+            embedding_str = str(embedding)
             session.execute(
-                text("""
+                text(f"""
                     INSERT INTO document_chunks (id, source_id, chunk_index, content, heading, tokens, embedding, metadata, created_at)
-                    VALUES (:id, :source_id, :chunk_index, :content, :heading, :tokens, :embedding::vector, '{}'::json, :created_at)
+                    VALUES (:id, :source_id, :chunk_index, :content, :heading, :tokens, '{embedding_str}'::vector, '{{}}'::json, :created_at)
                 """),
                 {
                     "id": chunk_id,
@@ -263,7 +270,6 @@ def seed_documents(session: Session) -> list[str]:
                     "content": chunk["content"],
                     "heading": chunk["heading"],
                     "tokens": tokens,
-                    "embedding": str(embedding),
                     "created_at": now,
                 },
             )
@@ -275,7 +281,7 @@ def seed_documents(session: Session) -> list[str]:
 
 def seed_tickets(session: Session):
     """Create mock tickets with classifications and messages."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for i, td in enumerate(TICKETS):
         ticket_id = str(uuid.uuid4())
@@ -350,9 +356,8 @@ def main():
     parser.add_argument("--clear", action="store_true", help="Clear existing data first")
     args = parser.parse_args()
 
-    if not settings.openai_api_key or settings.openai_api_key == "sk-...":
-        print("❌ OPENAI_API_KEY not set in .env")
-        sys.exit(1)
+    if not _has_key:
+        print("  ℹ️  No OPENAI_API_KEY — using mock embeddings")
 
     db_url = settings.database_url_sync
     engine = create_engine(db_url)

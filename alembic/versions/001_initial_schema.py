@@ -37,11 +37,11 @@ def upgrade() -> None:
         sa.Column("content", sa.Text, nullable=False),
         sa.Column("heading", sa.Text),
         sa.Column("tokens", sa.Integer),
-        sa.Column("embedding", sa.Text),
         sa.Column("metadata", sa.JSON, server_default="{}"),
         sa.Column("created_at", sa.DateTime, server_default=sa.func.now()),
         sa.UniqueConstraint("source_id", "chunk_index"),
     )
+    op.execute("ALTER TABLE document_chunks ADD COLUMN embedding vector(1536)")
 
     op.create_table(
         "tickets",

@@ -1,7 +1,6 @@
-from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from app.config import settings
 from app.graph.nodes import (
     analyze_node,
     check_escalation_node,
@@ -44,10 +43,5 @@ def build_graph() -> StateGraph:
     return builder
 
 
-def compile_graph() -> object:
-    builder = build_graph()
-    checkpointer = PostgresSaver.from_conn_string(settings.database_url_sync)
-    return builder.compile(checkpointer=checkpointer)
-
-
-support_graph = compile_graph()
+checkpointer = InMemorySaver()
+support_graph = build_graph().compile(checkpointer=checkpointer)

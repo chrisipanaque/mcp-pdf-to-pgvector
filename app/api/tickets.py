@@ -6,7 +6,7 @@ from app.core.errors import TicketNotFoundError
 from app.graph.graph import support_graph
 from app.graph.state import SupportState
 from app.schemas.ticket import TicketApprove, TicketCreate, TicketResponse
-from app.services.ticket_service import create_ticket, get_ticket, update_ticket
+from app.services.ticket_service import create_ticket, get_ticket, list_tickets, update_ticket
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -26,6 +26,11 @@ async def create_ticket_endpoint(data: TicketCreate, db: AsyncSession = Depends(
 
     ticket = await update_ticket(db, ticket.id, {"status": "processing"})
     return ticket
+
+
+@router.get("", response_model=list[TicketResponse])
+async def list_tickets_endpoint(db: AsyncSession = Depends(get_db)):
+    return await list_tickets(db)
 
 
 @router.get("/{ticket_id}", response_model=TicketResponse)

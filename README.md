@@ -78,7 +78,7 @@ FastAPI + SQLAlchemy (async) → PostgreSQL + pgvector → OpenAI (GPT-4o-mini +
 ### Prerequisites
 
 - Python 3.12+
-- Docker (optional, for PostgreSQL + pgvector)
+- Docker (for PostgreSQL + pgvector)
 - OpenAI API key
 
 ### Setup
@@ -90,24 +90,53 @@ cp .env.example .env
 
 Edit `.env` and set your `OPENAI_API_KEY`.
 
-### Option A: Docker Compose (recommended)
+### Step 1: Start the database
+
+```bash
+docker compose up -d db
+```
+
+PostgreSQL with pgvector starts in the background on port 5432.
+
+### Step 2: Seed demo data
+
+```bash
+pip install -r requirements.txt
+python scripts/seed.py
+```
+
+Creates 3 support documents with embedded chunks and 8 mock tickets in various states (resolved, escalated, processing, approved). Run with `--clear` to reset.
+
+### Step 3: Start the backend
+
+```bash
+uvicorn app.main:app --reload
+```
+
+FastAPI starts on `http://localhost:8000`.
+
+### Step 4: Open the frontend
+
+Open **http://localhost:8000** in your browser. The SPA provides:
+
+| Page | Route | What you can do |
+|---|---|---|
+| **New Ticket** | `#create` | Fill out the form and submit — triggers the LangGraph agent |
+| **Tickets** | `#tickets` | Browse all tickets, click to see details |
+| **Ticket Detail** | `#ticket/{id}` | View classification, sentiment, draft response. If escalated: approve/reject with edits |
+| **Chat** | `#chat` | Ask questions — agent searches the knowledge base and responds |
+| **Upload** | `#upload` | Upload support documents for RAG |
+
+### Or use Docker Compose (all-in-one)
 
 ```bash
 docker compose up
 ```
 
-This starts PostgreSQL with pgvector and the FastAPI app with hot-reload. Available at `http://localhost:8000`.
-
-### Option B: Run directly
+This starts PostgreSQL + the API with hot-reload. Then seed data in another terminal:
 
 ```bash
-pip install -r requirements.txt
-```
-
-Make sure you have PostgreSQL with pgvector running locally, then:
-
-```bash
-uvicorn app.main:app --reload
+python scripts/seed.py
 ```
 
 ### Verify
@@ -115,9 +144,6 @@ uvicorn app.main:app --reload
 ```bash
 curl http://localhost:8000/health
 # {"status":"healthy"}
-
-curl http://localhost:8000/ready
-# {"status":"ready"}
 ```
 
 ## API Reference

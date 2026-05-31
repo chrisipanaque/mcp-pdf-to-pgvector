@@ -20,6 +20,13 @@ async def create_ticket(db: AsyncSession, data: TicketCreate) -> Ticket:
     return ticket
 
 
+async def list_tickets(db: AsyncSession) -> list[Ticket]:
+    result = await db.execute(
+        select(Ticket).order_by(Ticket.created_at.desc()).limit(50)
+    )
+    return list(result.scalars().all())
+
+
 async def get_ticket(db: AsyncSession, ticket_id: str) -> Ticket | None:
     uid = uuid.UUID(ticket_id)
     result = await db.execute(select(Ticket).where(Ticket.id == uid))

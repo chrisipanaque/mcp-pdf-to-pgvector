@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.errors import global_exception_handler
@@ -33,3 +34,6 @@ async def health():
 @app.get("/ready")
 async def ready():
     return {"status": "ready"}
+
+
+app.mount("/", StaticFiles(directory="app/static", html=True), name="static")

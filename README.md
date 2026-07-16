@@ -6,7 +6,7 @@
   <img alt="Status" src="https://img.shields.io/badge/status-production%20ready-brightgreen.svg">
 </p>
 
-<h1 align="center">PDF to Vector MCP Server</h1>
+<h1 align="center">MCP PDF to PGVector</h1>
 
 <p align="center">
   An MCP server that ingests PDF documents into pgvector for semantic search and RAG pipelines.
@@ -75,9 +75,9 @@ Add to your `opencode.json` or `~/.config/opencode/opencode.json`:
 ```json
 {
   "mcp": {
-    "pdf-to-vector": {
+    "mcp-pdf-to-pgvector": {
       "type": "local",
-      "command": ["/path/to/pdf-to-vector-mcp/.venv/bin/python", "server.py"],
+      "command": ["/path/to/mcp-pdf-to-pgvector/.venv/bin/python", "server.py"],
       "enabled": true
     }
   }
@@ -111,7 +111,7 @@ check_indexing_progress(task_id="...")
 ```bash
 # Clone and enter
 git clone <url>
-cd pdf-to-vector-mcp
+cd mcp-pdf-to-pgvector
 
 # Create virtual environment and install dependencies
 python3 -m venv .venv

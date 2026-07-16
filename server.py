@@ -224,7 +224,7 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
         await db.close()
 
 
-mcp = FastMCP("PDF to Vector", lifespan=lifespan)
+mcp = FastMCP("mcp-pdf-to-pgvector", lifespan=lifespan)
 
 
 @mcp.tool()
